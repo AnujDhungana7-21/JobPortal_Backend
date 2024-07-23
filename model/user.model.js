@@ -1,0 +1,44 @@
+import mongoose from "mongoose";
+import { ROLES } from "../utils/constant.js";
+
+const userSchema = new mongoose.Schema(
+  {
+    fullname: {
+      type: String,
+      required: true,
+    },
+    contact: {
+      type: Number,
+      required: true,
+      minlength: 10,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      minlength: 7,
+    },
+    role: {
+      type: String,
+      enum: ROLES, //ROLES is array in ../utils/constant.js file
+      required: true,
+    },
+    profile: {
+      bio: { type: String },
+      skills: [{ type: String }],
+      resume: { type: String },
+      resumeOriginaName: { type: String },
+      company: { type: mongoose.Schema.Types.ObjectId, ref: "Company" },
+      profilePhoto: { type: String, default: "" },
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+const User = mongoose.model("User", userSchema);
+export default User;
