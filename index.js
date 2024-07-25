@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoConnection from "./utils/dataBase.js";
+import jobRouter from "./routes/job.routes.js";
 dotenv.config();
 const app = express();
 
@@ -23,6 +24,7 @@ app.use(cors(corsOptions));
  * Other middleware and routes setup
  */
 app.use("/api/user", authRouter);
+app.use("/api/job", jobRouter);
 
 /**
  * listen
