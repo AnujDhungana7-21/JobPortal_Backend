@@ -55,7 +55,7 @@ export const login = async (req, res) => {
         success: false,
       });
     }
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({
         message: "Invalid Email & Password",
@@ -87,7 +87,14 @@ export const login = async (req, res) => {
     const token = jwt.sign(tokenDate, process.env.SECRET_KEY, {
       expiresIn: "1d",
     });
-
+    user = {
+      _id: user._id,
+      fullname: user.fullname,
+      email: user.email,
+      contact: user.contact,
+      role: user.role,
+      profile: user.profile,
+    };
     return res
       .status(200)
       .cookie("token", token, {
@@ -114,20 +121,36 @@ export const login = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { fullname, email, contact, bio, skills } = req.body;
-    if (!fullname || !email || !contact || !bio || !skills) {
-      return res.status(400).json({
-        message: "All field is required",
-        success: false,
-      });
+    let skillsArray;
+    if (skills) {
+      skillsArray = skills.split(",");
     }
     const userId = req.id; //req.id is coming from isvalidate middleware
-    const user = await User.findById(userId);
+    let user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
         message: "User Not Found",
         success: false,
       });
     }
+    if (fullname) user.fullname = fullname;
+    if (email) user.email = email;
+    if (contact) user.contact = contact;
+    if (bio) user.bio = bio;
+    if (skills) user.skills = skillsArray;
+    await user.save();
+    user = {
+      _id: user._id,
+      fullname: user.fullname,
+      email: user.email,
+      contact: user.contact,
+      role: user.role,
+      profile: user.profile,
+    };
+    return res.status(200).json({
+      message: "User Update Successfully",
+      success: true,
+    });
   } catch (error) {
     res.status(500).json({
       message: error.message,

@@ -14,13 +14,24 @@ const userSchema = new mongoose.Schema(
     },
     email: {
       type: String,
+      validate: {
+        validator: async (value) => {
+          let matched = await mongoose.models.user.findOne({
+            email: value,
+          });
+          if (matched) {
+            return false;
+          }
+        },
+        message: "Email already exists",
+      },
       required: true,
-      unique: true,
     },
     password: {
       type: String,
       required: true,
       minlength: 7,
+      trim: true,
     },
     role: {
       type: String,

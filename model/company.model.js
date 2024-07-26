@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 const companySchema = new mongoose.Schema(
   {
-    title: {
+    companyname: {
       type: String,
       required: true,
     },
@@ -12,6 +12,13 @@ const companySchema = new mongoose.Schema(
     website: {
       type: String,
       required: true,
+    },
+    socialmedia: {
+      type: String,
+      required: true,
+    },
+    logo: {
+      type: String, //uri of logo
     },
     userid: {
       type: mongoose.Schema.Types.ObjectId,
