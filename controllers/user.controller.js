@@ -1,26 +1,45 @@
 import User from "../model/user.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
+import Joi from "joi";
+import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+dotenv.config();
 /**
  * Register new user in database
  */
 export const register = async (req, res) => {
+  /**
+   * server side validation for Register
+   */
+  // const validateUserRegister = Joi.object({
+  //   fullname: Joi.string().min(3).required(),
+  //   contact: Joi.number().required(),
+  //   password: Joi.string()
+  //     .pattern(new RegExp("^[a-zA-Z0-9]"))
+  //     .min(8)
+  //     .max(20)
+  //     .required(),
+  //   role: Joi.string().required().valid("Jobseeker", "employer"),
+  //   email: Joi.string().email().required(),
+  // });
+  // try {
+  //   await validateUserRegister.validateAsync(req.body, {
+  //     abortEarly: false,
+  //     allowUnknown: true,
+  //   });
+  // } catch (error) {
+  //   return res.status(400).json({
+  //     message: error.message,
+  //     success: false,
+  //   });
+  // }
+
+  /**
+   * logic and business modal
+   */
   try {
     const { fullname, contact, email, password, role } = req.body;
-    if (!fullname || !contact || !email || !password || !role) {
-      return res.status(400).json({
-        message: "All field is required.",
-        success: false,
-      });
-    }
-    const userExist = await User.findOne({ email });
-    if (userExist) {
-      return res.status(400).json({
-        message: "User already exists using this Email.",
-        success: false,
-      });
-    }
     //hash the password using bcryptjs
     const hashPassword = await bcrypt.hash(password, 10);
     //create a new user
@@ -36,9 +55,10 @@ export const register = async (req, res) => {
       success: true,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: error.message,
-      success: false,
+    res.status(500).json({
+      error: error.message,
+      message: "server Error",
+      status: false,
     });
   }
 };
@@ -47,6 +67,23 @@ export const register = async (req, res) => {
  * Login user
  */
 export const login = async (req, res) => {
+  /**
+   * server side validation for Register
+   */
+  const validateUserLogin = Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().required(),
+    role: Joi.string().required().valid("Jobseeker", "employer"),
+  });
+  try {
+    await validateUserLogin.validateAsync(req.body, { abortEarly: false });
+  } catch (err) {
+    return res.status(400).json({
+      message: err.message,
+      success: false,
+    });
+  }
+
   try {
     const { email, password, role } = req.body;
     if (!email || !password || !role) {
@@ -65,7 +102,9 @@ export const login = async (req, res) => {
     /**
      * compare hash password of user
      */
-    const isPasswordMatch = await bcrypt.compare(password, user.password);
+    const isPasswordMatch = await bcrypt
+      .compare(password, user.password)
+      .select("+password");
     if (!isPasswordMatch) {
       return res.status(400).json({
         message: "Invalid Email & Password",
@@ -108,9 +147,10 @@ export const login = async (req, res) => {
         success: true,
       });
   } catch (error) {
-    return res.status(500).json({
-      message: error.message,
-      success: false,
+    res.status(500).json({
+      error: err.message,
+      message: "server Error",
+      status: false,
     });
   }
 };
@@ -153,8 +193,9 @@ export const updateProfile = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: error.message,
-      success: false,
+      error: err.message,
+      message: "server Error",
+      status: false,
     });
   }
 };
@@ -170,7 +211,94 @@ export const logout = (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: error.message,
+      error: error.message,
+      message: "Internal Server Error",
+      success: false,
+    });
+  }
+};
+/**
+ * email config
+ */
+
+const transporter = nodemailer.createTransport({
+  host: process.env.NODEMAILER_HOST,
+  port: process.env.NODEMAILER_PORT,
+  secure: process.env.NODEMAILER_PORT == 465, // Use `true` for port 465, `false` for all other ports
+  auth: {
+    user: process.env.NODEMAILER_EMAIL,
+    pass: process.env.NODEMAILER_PASSCODE,
+  },
+});
+
+export const forgetPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        message: "Email is required",
+      });
+    }
+
+    const matched = await User.findOne({ email: email });
+    if (!matched) {
+      return res.status(404).json({
+        message: "Email doesn't exist.",
+      });
+    }
+
+    const token = jwt.sign({ _id: matched._id }, process.env.SECRET_KEY, {
+      expiresIn: "120s",
+    });
+
+    const verifyToken = await User.findByIdAndUpdate(
+      matched._id,
+      { resetToken: token },
+      { new: true }
+    );
+
+    if (!verifyToken) {
+      return res.status(500).json({
+        message: "Failed to generate reset token.",
+      });
+    }
+
+    if (transporter) {
+      const mailOptions = {
+        from: process.env.NODEMAILER_EMAIL,
+        to: email,
+        subject: "Forgot Password Reset Link",
+        html: `<h1>The given link will be valid for 2 minutes only.</h1>
+               <p>Please click the link to reset your password: <a href="http://localhost:5173/api/user/forgotpassword/${matched._id}/${verifyToken.resetToken}">Reset Password</a></p>`,
+      };
+
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.log(error);
+          return res.status(500).json({
+            message: "Failed to send email.",
+            success: false,
+          });
+        } else {
+          console.log("Email sent.", info.response);
+          return res.status(200).json({
+            message: "Email sent successfully.",
+            resetLink: info.response,
+            success: true,
+          });
+        }
+      });
+    } else {
+      return res.status(500).json({
+        message: "Email transporter is not configured.",
+        success: false,
+      });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      error: error.message,
+      message: "Internal server error",
       success: false,
     });
   }

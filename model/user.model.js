@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       validate: {
         validator: async (value) => {
-          let matched = await mongoose.models.user.findOne({
+          let matched = await mongoose.models.User.findOne({
             email: value,
           });
           if (matched) {
@@ -32,6 +32,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 7,
       trim: true,
+      select: false,
     },
     role: {
       type: String,
@@ -46,7 +47,11 @@ const userSchema = new mongoose.Schema(
       company: { type: mongoose.Schema.Types.ObjectId, ref: "Company" },
       profilePhoto: { type: String, default: "" },
     },
+    resetToken: {
+      type: String,
+    },
   },
+
   {
     timestamps: true,
   }
