@@ -47,9 +47,27 @@ const userSchema = new mongoose.Schema(
       company: { type: mongoose.Schema.Types.ObjectId, ref: "Company" },
       profilePhoto: { type: String, default: "" },
     },
-    resetToken: {
-      type: String,
-    },
+    //advance authentication
+    // lastlogin: {
+    //   type: Date,
+    //   default: Date.now(),
+    // },
+    // isverified: {
+    //   type: Boolean,
+    //   default: false,
+    // },
+    // resetPasswordToken: {
+    //   type: String,
+    // },
+    // resetPasswordTokenExpriesAt: {
+    //   type: Date,
+    // },
+    // varificationToken: {
+    //   type: String,
+    // },
+    // varificationTokenExpriesAt: {
+    //   type: Date,
+    // },
   },
 
   {

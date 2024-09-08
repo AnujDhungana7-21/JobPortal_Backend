@@ -2,234 +2,150 @@ import User from "../model/user.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Joi from "joi";
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { transporter } from "../utils/emailConfig.js";
+import ErrorHandler from "../middleware/error.js";
+import { catchAsyncError } from "../middleware/catchAsyncError.js";
 dotenv.config();
 /**
  * Register new user in database
  */
-export const register = async (req, res) => {
-  /**
-   * server side validation for Register
-   */
-  // const validateUserRegister = Joi.object({
-  //   fullname: Joi.string().min(3).required(),
-  //   contact: Joi.number().required(),
-  //   password: Joi.string()
-  //     .pattern(new RegExp("^[a-zA-Z0-9]"))
-  //     .min(8)
-  //     .max(20)
-  //     .required(),
-  //   role: Joi.string().required().valid("Jobseeker", "employer"),
-  //   email: Joi.string().email().required(),
-  // });
-  // try {
-  //   await validateUserRegister.validateAsync(req.body, {
-  //     abortEarly: false,
-  //     allowUnknown: true,
-  //   });
-  // } catch (error) {
-  //   return res.status(400).json({
-  //     message: error.message,
-  //     success: false,
-  //   });
-  // }
-
+export const register = catchAsyncError(async (req, res, next) => {
   /**
    * logic and business modal
    */
-  try {
-    const { fullname, contact, email, password, role } = req.body;
-    //hash the password using bcryptjs
-    const hashPassword = await bcrypt.hash(password, 10);
-    //create a new user
-    await User.create({
-      fullname,
-      contact,
-      email,
-      password: hashPassword,
-      role,
-    });
-    res.status(201).json({
-      message: "User Created Successfully",
-      success: true,
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message,
-      message: "server Error",
-      status: false,
-    });
+
+  const { fullname, contact, email, password, role } = req.body;
+  const userExists = await User.findOne({ email: email });
+  if (userExists) {
+    return next(
+      ErrorHandler.duplicate(
+        "Email already exists from this email.Please Try with another one"
+      )
+    );
   }
-};
+  //hash the password using bcryptjs
+  const hashPassword = await bcrypt.hash(password, 10);
+  //create a new user
+  await User.create({
+    ...req.body,
+    password: hashPassword,
+  });
+  const userWithOutPassword = await User.findOne({ email }).select("-password");
+  return res.status(201).json({
+    message: "User Created Successfully",
+    success: true,
+    user: userWithOutPassword,
+  });
+});
 
 /**
  * Login user
  */
-export const login = async (req, res) => {
+export const login = catchAsyncError(async (req, res, next) => {
+  const { email, password, role } = req.body;
+  // console.log(req.body);
+
+  const user = await User.findOne({ email: email }).select("+password");
+  // console.log(user);
+
+  if (!user) {
+    return next(ErrorHandler.unauthorized("Invalid Email & Password"));
+  }
   /**
-   * server side validation for Register
+   * compare hash password of user
    */
-  const validateUserLogin = Joi.object({
-    email: Joi.string().email().required(),
-    password: Joi.string().required(),
-    role: Joi.string().required().valid("Jobseeker", "employer"),
+  const isPasswordMatch = await bcrypt.compare(password, user.password);
+
+  if (!isPasswordMatch) {
+    return next(ErrorHandler.unauthorized("Invalid Email & Password"));
+  }
+  /**
+   * check role
+   */
+  if (role !== user.role) {
+    return next(
+      ErrorHandler.unauthorized("Account Doesnot match with current Role")
+    );
+  }
+  //generate token using JWT
+  const token = jwt.sign({ userId: user._id }, process.env.SECRET_KEY, {
+    expiresIn: "1d",
   });
-  try {
-    await validateUserLogin.validateAsync(req.body, { abortEarly: false });
-  } catch (err) {
-    return res.status(400).json({
-      message: err.message,
-      success: false,
-    });
-  }
+  // remove password
+  const userWithOutPassword = await User.findOne({ email }).select("-password");
 
-  try {
-    const { email, password, role } = req.body;
-    if (!email || !password || !role) {
-      return res.status(400).json({
-        message: "All field is required",
-        success: false,
-      });
-    }
-    let user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({
-        message: "Invalid Email & Password",
-        success: false,
-      });
-    }
-    /**
-     * compare hash password of user
-     */
-    const isPasswordMatch = await bcrypt
-      .compare(password, user.password)
-      .select("+password");
-    if (!isPasswordMatch) {
-      return res.status(400).json({
-        message: "Invalid Email & Password",
-        success: false,
-      });
-    }
-    /**
-     * check role
-     */
-    if (role !== user.role) {
-      return res.status(400).json({
-        message: "Account Doesn`t exists with Current Role",
-        success: false,
-      });
-    }
-    const tokenDate = {
-      userId: user._id,
-    };
-    const token = jwt.sign(tokenDate, process.env.SECRET_KEY, {
-      expiresIn: "1d",
+  return res
+    .status(200)
+    .cookie("token", token, {
+      maxAge: 1 * 24 * 60 * 60 * 1000,
+      httpsOnly: true,
+      samesite: "strict",
+    })
+    .json({
+      message: `Welcome ${user.fullname}`,
+      user: userWithOutPassword,
+      success: true,
     });
-    user = {
-      _id: user._id,
-      fullname: user.fullname,
-      email: user.email,
-      contact: user.contact,
-      role: user.role,
-      profile: user.profile,
-    };
-    return res
-      .status(200)
-      .cookie("token", token, {
-        maxAge: 1 * 24 * 60 * 60 * 1000,
-        httpsOnly: true,
-        samesite: "strict",
-      })
-      .json({
-        message: `Welcome ${user.fullname}`,
-        user,
-        success: true,
-      });
-  } catch (error) {
-    res.status(500).json({
-      error: err.message,
-      message: "server Error",
-      status: false,
-    });
-  }
-};
-
+});
 /**
  * Update user profile
  */
-export const updateProfile = async (req, res) => {
-  try {
-    const { fullname, email, contact, bio, skills } = req.body;
-    let skillsArray;
-    if (skills) {
-      skillsArray = skills.split(",");
-    }
-    const userId = req.id; //req.id is coming from isvalidate middleware
-    let user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        message: "User Not Found",
-        success: false,
-      });
-    }
-    if (fullname) user.fullname = fullname;
-    if (email) user.email = email;
-    if (contact) user.contact = contact;
-    if (bio) user.bio = bio;
-    if (skills) user.skills = skillsArray;
-    await user.save();
-    user = {
-      _id: user._id,
-      fullname: user.fullname,
-      email: user.email,
-      contact: user.contact,
-      role: user.role,
-      profile: user.profile,
-    };
-    return res.status(200).json({
-      message: "User Update Successfully",
-      success: true,
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: err.message,
-      message: "server Error",
-      status: false,
-    });
+export const updateProfile = catchAsyncError(async (req, res) => {
+  const { fullname, email, contact, bio, skills } = req.body;
+  let skillsArray;
+  if (skills) {
+    skillsArray = skills.split(",");
   }
-};
+  const userId = req.id;
+  //req.id is coming from isAuthenticated middleware
+  let user = await User.findByIdAndUpdate(
+    userId,
+    { fullname, email, contact, bio, skills: skillsArray },
+    { new: true }
+  );
+  if (!user) {
+    return next(ErrorHandler.notFound("User Not Found"));
+  }
+  return res.status(200).json({
+    message: "User Update Successfully",
+    success: true,
+    user,
+  });
+});
+
+/**
+ * delete User Profile
+ * but user Information is only deleted after 30days
+ */
+export const deleteUser = catchAsyncError(async (req, res, next) => {
+  const userId = req.id; //coming from is Authenticated middleware
+  console.log(userId);
+
+  const matchUserId = await User.findById(userId);
+  if (!matchUserId) {
+    return next(ErrorHandler.notFound("User Not found"));
+  }
+  await User.findByIdAndDelete(userId);
+  res.status(204).cookie("token", "", { maxAge: 0 }).json({
+    status: true,
+    message: "User Deleted",
+  });
+});
 
 /**
  * logout user
  */
-export const logout = (req, res) => {
-  try {
-    return res.status(200).cookie("token", "", { maxAge: 0 }).json({
-      message: "Logout Successfully",
-      success: true,
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message,
-      message: "Internal Server Error",
-      success: false,
-    });
-  }
-};
+export const logout = catchAsyncError(async (req, res, next) => {
+  return res.status(200).cookie("token", "", { maxAge: 0 }).json({
+    message: "Logout Successfully",
+    success: true,
+  });
+});
+
 /**
  * email config
  */
-
-const transporter = nodemailer.createTransport({
-  host: process.env.NODEMAILER_HOST,
-  port: process.env.NODEMAILER_PORT,
-  secure: process.env.NODEMAILER_PORT == 465, // Use `true` for port 465, `false` for all other ports
-  auth: {
-    user: process.env.NODEMAILER_EMAIL,
-    pass: process.env.NODEMAILER_PASSCODE,
-  },
-});
 
 export const forgetPassword = async (req, res) => {
   try {
@@ -271,7 +187,6 @@ export const forgetPassword = async (req, res) => {
         html: `<h1>The given link will be valid for 2 minutes only.</h1>
                <p>Please click the link to reset your password: <a href="http://localhost:5173/api/user/forgotpassword/${matched._id}/${verifyToken.resetToken}">Reset Password</a></p>`,
       };
-
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
           console.log(error);
@@ -280,7 +195,7 @@ export const forgetPassword = async (req, res) => {
             success: false,
           });
         } else {
-          console.log("Email sent.", info.response);
+          // console.log("Email sent.", info.response);
           return res.status(200).json({
             message: "Email sent successfully.",
             resetLink: info.response,
@@ -295,11 +210,6 @@ export const forgetPassword = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      error: error.message,
-      message: "Internal server error",
-      success: false,
-    });
+    next(error);
   }
 };

@@ -6,7 +6,7 @@ const jobSchema = new mongoose.Schema(
       required: true,
     },
     salary: {
-      type: String,
+      type: Number,
       required: true,
     },
     location: {
@@ -42,7 +42,7 @@ const jobSchema = new mongoose.Schema(
     company: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Company",
-      required: true,
+      // required: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
