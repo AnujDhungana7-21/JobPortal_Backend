@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import mongoConnection from "./utils/dataBase.js";
 import jobRouter from "./routes/job.routes.js";
 import companyRouter from "./routes/company.routes.js";
+import applicationRouter from "./routes/application.routes.js";
 import { errorMiddleware } from "./middleware/error.js";
 import cluster from "cluster";
 import os from "os";
@@ -50,11 +51,12 @@ if (cluster.isMaster) {
   /**
    * Other middleware and routes setup
    */
-  app.use("/api/user", authRouter);
-  app.use("/api/company", companyRouter);
-  app.use("/api/job", jobRouter);
+  app.use("/user", authRouter);
+  app.use("/company", companyRouter);
+  app.use("/job", jobRouter);
+  app.use("/application", applicationRouter);
 
-  // Catch-all route for undefined routes
+  // Catch-all error for undefined routes
   app.all("*", (req, res) => {
     return res.status(400).json({
       message: "Bad request/Routes Not Found",

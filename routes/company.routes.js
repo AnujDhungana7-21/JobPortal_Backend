@@ -1,5 +1,8 @@
 import express from "express";
-import isAuthenticated from "../middleware/isAuthenticated.js";
+import {
+  isAuthenticated,
+  isEmployer,
+} from "../middleware/isAuthenticated.js";
 import validate from "../middleware/validator.middleware.js";
 import Joi from "joi";
 import {
@@ -28,15 +31,16 @@ const router = express.Router();
 router.post(
   "/register",
   isAuthenticated,
+  isEmployer,
   validate(registerCompanySchema),
   registerCompany
 );
 // Get all companies
-router.get("/", isAuthenticated, getCompany);
+router.get("/", isAuthenticated, isEmployer, getCompany);
 // Get Company By Id
 router.get("/:id", getCompanyByID);
 //Update company By Id
-router.put("/:id", isAuthenticated, updateCompany);
+router.put("/:id", isAuthenticated, isEmployer, updateCompany);
 //delete Company By Id
-router.delete("/:id", isAuthenticated, deleteCompany);
+router.delete("/:id", isAuthenticated, isEmployer, deleteCompany);
 export default router;

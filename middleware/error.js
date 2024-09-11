@@ -6,20 +6,9 @@ class ErrorHandler extends Error {
     // Maintain proper stack trace in V8 engines like Node.js
     Error.captureStackTrace(this, this.constructor);
   }
-
-  // Static method for "Not Found" errors
-  static notFound(message = "Resource not found") {
-    return new ErrorHandler(message, 404);
-  }
-
-  // Static method for "Unauthorized" errors
-  static unauthorized(message = "Unauthorized access") {
-    return new ErrorHandler(message, 401);
-  }
-
-  // Static method for "Duplicate" errors
-  static duplicate(message = "Duplicate field value entered") {
-    return new ErrorHandler(message, 400);
+  // Static method for errors
+  static allErrors(message = "Bad Request", statusCode = 400) {
+    return new ErrorHandler(message, statusCode);
   }
 }
 
@@ -42,12 +31,12 @@ export const errorMiddleware = (err, req, res, next) => {
   }
 
   if (err.name === "JsonWebTokenError") {
-    const message = "Invalid JSON Web Token. Please try again.";
+    const message = "Invalid Web Token. Please try again."; // invalid json web token
     err = new ErrorHandler(message, 400);
   }
 
   if (err.name === "TokenExpiredError") {
-    const message = "JSON Web Token has expired. Please log in again.";
+    const message = "Token has expired. Please log in again."; //json web token
     err = new ErrorHandler(message, 400);
   }
 

@@ -8,14 +8,14 @@ import {
   forgetPassword,
   deleteUser,
 } from "../controllers/user.controller.js";
-import isAuthenticated from "../middleware/isAuthenticated.js";
+import { isAuthenticated, isEmployer, isJobseeker } from "../middleware/isAuthenticated.js";
 import validate from "../middleware/validator.middleware.js";
 
 // Register Schema
 const userRegisterSchema = Joi.object({
   fullname: Joi.string().min(3).required(),
   contact: Joi.number().required(),
-  password: Joi.string().required(),
+  password: Joi.string().min(7).required(),
   role: Joi.string().required().valid("Jobseeker", "employer"),
   email: Joi.string().email().required(),
 });

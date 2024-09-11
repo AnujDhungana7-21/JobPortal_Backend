@@ -19,8 +19,9 @@ export const register = catchAsyncError(async (req, res, next) => {
   const userExists = await User.findOne({ email: email });
   if (userExists) {
     return next(
-      ErrorHandler.duplicate(
-        "Email already exists from this email.Please Try with another one"
+      ErrorHandler.allErrors(
+        "Email already exists.Please Try with another one",
+        400
       )
     );
   }
@@ -50,7 +51,7 @@ export const login = catchAsyncError(async (req, res, next) => {
   // console.log(user);
 
   if (!user) {
-    return next(ErrorHandler.unauthorized("Invalid Email & Password"));
+    return next(ErrorHandler.allErrors("Invalid Email & Password", 401));
   }
   /**
    * compare hash password of user
@@ -58,14 +59,14 @@ export const login = catchAsyncError(async (req, res, next) => {
   const isPasswordMatch = await bcrypt.compare(password, user.password);
 
   if (!isPasswordMatch) {
-    return next(ErrorHandler.unauthorized("Invalid Email & Password"));
+    return next(ErrorHandler.allErrors("Invalid Email & Password", 401));
   }
   /**
    * check role
    */
   if (role !== user.role) {
     return next(
-      ErrorHandler.unauthorized("Account Doesnot match with current Role")
+      ErrorHandler.allErrors("Account Doesnot match with current Role", 403)
     );
   }
   //generate token using JWT
@@ -105,7 +106,7 @@ export const updateProfile = catchAsyncError(async (req, res) => {
     { new: true }
   );
   if (!user) {
-    return next(ErrorHandler.notFound("User Not Found"));
+    return next(ErrorHandler.allErrors("User Not Found", 404));
   }
   return res.status(200).json({
     message: "User Update Successfully",
@@ -124,7 +125,7 @@ export const deleteUser = catchAsyncError(async (req, res, next) => {
 
   const matchUserId = await User.findById(userId);
   if (!matchUserId) {
-    return next(ErrorHandler.notFound("User Not found"));
+    return next(ErrorHandler.allErrors("User Not found", 404));
   }
   await User.findByIdAndDelete(userId);
   res.status(204).cookie("token", "", { maxAge: 0 }).json({
@@ -151,16 +152,12 @@ export const forgetPassword = async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({
-        message: "Email is required",
-      });
+      return next(ErrorHandler.allErrors("Email is required", 400));
     }
 
     const matched = await User.findOne({ email: email });
     if (!matched) {
-      return res.status(404).json({
-        message: "Email doesn't exist.",
-      });
+      return next(ErrorHandler.allErrors("User not Found", 404));
     }
 
     const token = jwt.sign({ _id: matched._id }, process.env.SECRET_KEY, {

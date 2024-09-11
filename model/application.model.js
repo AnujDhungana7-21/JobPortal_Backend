@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { STATUS } from "../utils/constant";
+import { STATUS } from "../utils/constant.js";
 
 const applicationSchema = new mongoose.Schema(
   {

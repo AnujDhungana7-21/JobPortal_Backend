@@ -2,17 +2,18 @@ import { catchAsyncError } from "../middleware/catchAsyncError.js";
 import ErrorHandler from "../middleware/error.js";
 import { Company } from "../model/company.model.js";
 /**
- * Register Company for employees
+ * Register Company by employees
  */
 export const registerCompany = catchAsyncError(async (req, res, next) => {
-  let { companyname, description, website, socialmedia } = req.body;
+  let { companyname, description, website, socialmedia, logo } = req.body;
   const userid = req.id;
   companyname.trim().toLowerCase();
   const match = await Company.findOne({ companyname });
   if (match) {
     return next(
-      ErrorHandler.duplicate(
-        "Company name is already Taken. please Try Another Name"
+      ErrorHandler.allErrors(
+        "Company name is already Taken. please Try Another Name",
+        400
       )
     );
   }
@@ -39,7 +40,7 @@ export const getCompany = catchAsyncError(async (req, res, next) => {
 
   const companies = await Company.find({ userid: userId });
   if (!companies) {
-    return next(ErrorHandler.notFound("Companies not found"));
+    return next(ErrorHandler.allErrors("Companies not found", 404));
   }
   return res.status(200).json({
     companies,
@@ -54,7 +55,7 @@ export const getCompanyByID = catchAsyncError(async (req, res, next) => {
   const id = req.params.id;
   const findCompany = await Company.findById({ _id: id });
   if (!findCompany) {
-    return next(ErrorHandler.notFound("company not Found"));
+    return next(ErrorHandler.allErrors("company not Found", 404));
   }
   return res.status(200).json({
     findCompany,
@@ -70,23 +71,26 @@ export const updateCompany = catchAsyncError(async (req, res, next) => {
   const userid = req.id; // from is Authenticated middleware
   const id = req.params.id; // id is comming from params
 
+  // check if the Company Exists
+  const companyExists = await Company.findById(id);
+  if (!companyExists) return ErrorHandler.allErrors("Company not Found", 404);
+
+  // Check if the company exists with valid user
   const Data = await Company.findOneAndUpdate(
     { _id: id, userid },
     {
       ...req.body,
-      logo
+      logo,
     },
     { new: true }
   );
   if (!Data) {
     return next(
-      ErrorHandler.notFound(
-        "Company not found or You donnot have permission to Update"
-      )
+      ErrorHandler.allErrors("You donot have permission to Update", 403)
     );
   }
   return res.status(200).json({
-    message: "Successfully updated",
+    message: "Company Successfully updated",
     Data,
     success: true,
   });
@@ -98,13 +102,16 @@ export const updateCompany = catchAsyncError(async (req, res, next) => {
 export const deleteCompany = catchAsyncError(async (req, res, next) => {
   const userid = req.id;
   const id = req.params.id;
+
+  // check if the Company Exists
+  const companyExists = await Company.findById(id);
+  if (!companyExists) return ErrorHandler.allErrors("Company not Found", 404);
+
   // Check if the company exists with valid user
-  const match = await Company.findOne({ _id: id, userid });
+  const match = await Company.findOne({ _id: id, userid: userid });
   if (!match) {
     return next(
-      ErrorHandler.notFound(
-        "Company not found or You donnot have permission to delete"
-      )
+      ErrorHandler.allErrors("You donot have permission to delete", 403)
     );
   }
 
